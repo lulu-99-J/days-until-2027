@@ -365,7 +365,9 @@
     $progressLabel.textContent = label;
 
     // 当前时间（让页面有"活着"的感觉）
-    $live.textContent = `现在 ${now.getFullYear()}.${pad(now.getMonth()+1)}.${pad(now.getDate())} 周${wk} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const nd = new Date();
+    const wk = ['日','一','二','三','四','五','六'][nd.getDay()];
+    $live.textContent = `现在 ${nd.getFullYear()}.${pad(nd.getMonth()+1)}.${pad(nd.getDate())} 周${wk} ${pad(nd.getHours())}:${pad(nd.getMinutes())}:${pad(nd.getSeconds())}`;
   }
 
   /* ---------- LocalStorage：记忆胶囊 + 心愿列表 ---------- */
@@ -489,13 +491,16 @@
     else   { inp.value = wishes[i].t; } // 空值不保存，还原
   });
 
-  renderCapsules();
-  renderWishes();
-
-  paintToday();
-  paint();
-  // 用 setInterval 1000ms，配合每秒重绘
+  // 先注册秒表：即使下面任何初始化出错，倒计时也照常跳动
   setInterval(paint, 1000);
+
+  try {
+    renderCapsules();
+    renderWishes();
+    paintToday();
+  } catch (e) { console.error('init:', e); }
+
+  paint();
 })();
 </script>
 </body>
