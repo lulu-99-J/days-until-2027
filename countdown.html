@@ -148,9 +148,9 @@
       <p id="progress-label" class="text-center text-xs text-softink mt-3">已经走了一小段路</p>
       <!-- 双面进度：已走过 vs 还剩 -->
       <div id="dual" class="mt-3 flex justify-center items-center gap-3 text-[11px] text-softink">
-        <span><span class="digit text-ink/80" id="gone-days">--</span> 天已经走过</span>
+        <span>已经走到第 <span class="digit text-ink/80" id="gone-days">--</span> 天</span>
         <span class="w-px h-3 bg-sand"></span>
-        <span><span class="digit text-cocoa" id="left-days">--</span> 天还在等</span>
+        <span>还剩 <span class="digit text-cocoa" id="left-days">--</span> 天</span>
       </div>
     </div>
   </section>
@@ -314,11 +314,13 @@
     $bar.style.width = pct.toFixed(2) + '%';
     $pct.textContent = pct.toFixed(1) + '%';
 
-    // 双面进度
+    // 双面进度：与倒计时数字咬合
+    // totalDays = 130（向上取整）；leftDays 直接用倒计时的 day；
+    // goneDays = 第 N 天 = totalDays - leftDays（今天=第1天，最后一天=第130天）
     const msPerDay = 86400000;
-    const totalDays = Math.floor(total / msPerDay);
-    const goneDays  = Math.min(totalDays, Math.max(0, Math.floor(passed / msPerDay)));
-    const leftDays  = Math.max(0, totalDays - goneDays);
+    const totalDays = Math.ceil(total / msPerDay);
+    const leftDays  = day;
+    const goneDays  = Math.max(1, totalDays - leftDays);
     $goneDays.textContent = goneDays;
     $leftDays.textContent = leftDays;
 
