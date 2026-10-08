@@ -134,10 +134,37 @@
         <span id="pct" class="digit">0%</span>
         <span>2027·02·15</span>
       </div>
-      <div class="h-1.5 w-full bg-sand/60 rounded-full overflow-hidden">
-        <div id="bar" class="h-full bg-gradient-to-r from-mauve to-blush rounded-full transition-[width] duration-700 ease-out" style="width: 0%"></div>
+      <div class="relative h-1.5 w-full bg-sand/60 rounded-full overflow-visible">
+        <div id="bar" class="absolute left-0 top-0 h-full bg-gradient-to-r from-mauve to-blush rounded-full transition-[width] duration-700 ease-out" style="width: 0%"></div>
+        <!-- 4 个里程碑小点 -->
+        <div class="absolute inset-0 pointer-events-none">
+          <div class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-0   w-1.5 h-1.5 rounded-full bg-sand"></div>
+          <div class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-[25%]  w-1.5 h-1.5 rounded-full bg-sand"></div>
+          <div class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-[50%]  w-1.5 h-1.5 rounded-full bg-sand"></div>
+          <div class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-[75%]  w-1.5 h-1.5 rounded-full bg-sand"></div>
+          <div class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-full w-1.5 h-1.5 rounded-full bg-sand"></div>
+        </div>
       </div>
       <p id="progress-label" class="text-center text-xs text-softink mt-3">已经走了一小段路</p>
+      <!-- 双面进度：已走过 vs 还剩 -->
+      <div id="dual" class="mt-3 flex justify-center items-center gap-3 text-[11px] text-softink">
+        <span><span class="digit text-ink/80" id="gone-days">--</span> 天已经走过</span>
+        <span class="w-px h-3 bg-sand"></span>
+        <span><span class="digit text-cocoa" id="left-days">--</span> 天还在等</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 今日小卡：让 129 天每天打开都有一点不一样 -->
+  <section class="mt-6 bg-white/60 backdrop-blur-sm rounded-[24px] border border-sand/60 px-6 py-5">
+    <div class="flex items-center justify-between">
+      <p class="text-[10px] tracking-[0.3em] text-softink uppercase">today</p>
+      <p id="today-date" class="text-[11px] text-softink digit">--</p>
+    </div>
+    <p id="today-quote" class="mt-3 text-[15px] leading-relaxed text-ink">—</p>
+    <div class="mt-4 pt-4 border-t border-dashed border-sand/80">
+      <p class="text-[10px] tracking-[0.3em] text-cocoa/80 uppercase">little thing</p>
+      <p id="today-task" class="mt-1 text-[13px] text-softink">—</p>
     </div>
   </section>
 
@@ -169,10 +196,15 @@
   const $pct = document.getElementById('pct');
   const $live = document.getElementById('live');
   const $progressLabel = document.getElementById('progress-label');
+  const $goneDays  = document.getElementById('gone-days');
+  const $leftDays  = document.getElementById('left-days');
+  const $todayDate = document.getElementById('today-date');
+  const $todayQuote= document.getElementById('today-quote');
+  const $todayTask = document.getElementById('today-task');
 
   const pad = n => String(Math.max(0, n)).padStart(2, '0');
 
-  // 抵达当日文案
+  // 阶段文案
   const labels = {
     early: '刚刚开始，别急',
     small: '已经走了一小段路',
@@ -180,6 +212,76 @@
     near:  '马上就要到了',
     done:  '今天就是那一天 ✿'
   };
+
+  // 暖心话语 30 句
+  const QUOTES = [
+    '今天也是被温柔对待的一天。',
+    '慢一点，没关系。',
+    '在等待里，你也在变成自己。',
+    '不必每一天都拼尽全力。',
+    '允许自己今天就只是这样。',
+    '你已经很努力地在往前走了。',
+    '想休息的时候，就真的休息。',
+    '明天的太阳照样会升起来。',
+    '此刻的呼吸，就是你的节奏。',
+    '拥抱自己一下，像抱一个朋友。',
+    '如果今天有点糟，那就有点糟吧。',
+    '日子过一天，就少一天等待。',
+    '到了那天，回头看会觉得很快的。',
+    '一杯热茶，可以慢一点喝完。',
+    '不必为还没发生的事担心。',
+    '你看，今天的天空也很温柔。',
+    '一切都是过程，包括等待。',
+    '你值得被这段时间好好对待。',
+    '每天醒来，又近了一天。',
+    '心里难过的话，就难过一会儿吧。',
+    '你比自己想象中更稳。',
+    '在忙，也别忘了吃东西。',
+    '今天已经赢了昨天的自己。',
+    '让风替你说一声辛苦了。',
+    '慢慢地、稳稳地，就是最好。',
+    '把今天过成自己喜欢的样子。',
+    '一切都会来的，按它的节奏。',
+    '今天也是个好日子，就因为有你在。',
+    '你一直在认真地走这条路。',
+    '黑夜里也有人在等同一束光。',
+  ];
+
+  // 不打卡的小任务 15 个
+  const TASKS = [
+    '深呼吸 3 次，慢慢吐气。',
+    '给一个你想念的人发条消息。',
+    '看窗外 5 分钟，看什么都行。',
+    '喝一杯温水，感受它的温度。',
+    '把肩膀放松下来，转转脖子。',
+    '听一首你最熟悉的歌。',
+    '对镜子里的自己笑一下。',
+    '写下今天 1 件还不错的小事。',
+    '找一处光，晒一下自己的脸。',
+    '把身边收拾整齐一角就好。',
+    '闭上眼睛，数 60 下。',
+    '起床后先站一会儿，别急。',
+    '把手机放下 30 分钟。',
+    '摸摸自己的手背，告诉它辛苦了。',
+    '起身倒一杯水，不需要喝也行。',
+  ];
+
+  // 用日期 hash 当日稳定选题（每天同样的，打开几次都是同一句）
+  function daySeed() {
+    const now = new Date();
+    return Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+  }
+  function pick(arr) { return arr[daySeed() % arr.length]; }
+  function pickIdx(i) { return arr => arr[(daySeed() + i) % arr.length]; }
+
+  // 渲染今日卡（一次性）
+  function paintToday() {
+    const now = new Date();
+    const wk = ['日','一','二','三','四','五','六'][now.getDay()];
+    $todayDate.textContent = `${now.getMonth()+1}月${now.getDate()}日 · 周${wk}`;
+    $todayQuote.textContent = '「' + pick(QUOTES) + '」';
+    $todayTask.textContent  = pickIdx(7)(TASKS);
+  }
 
   function paint() {
     const now = Date.now();
@@ -212,6 +314,14 @@
     $bar.style.width = pct.toFixed(2) + '%';
     $pct.textContent = pct.toFixed(1) + '%';
 
+    // 双面进度
+    const msPerDay = 86400000;
+    const totalDays = Math.floor(total / msPerDay);
+    const goneDays  = Math.min(totalDays, Math.max(0, Math.floor(passed / msPerDay)));
+    const leftDays  = Math.max(0, totalDays - goneDays);
+    $goneDays.textContent = goneDays;
+    $leftDays.textContent = leftDays;
+
     // 阶段文案
     let label = labels.small;
     if (pct < 5)       label = labels.early;
@@ -221,11 +331,10 @@
     $progressLabel.textContent = label;
 
     // 当前时间（让页面有"活着"的感觉）
-    const d = new Date();
-    const wk = ['日','一','二','三','四','五','六'][d.getDay()];
-    $live.textContent = `现在 ${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} 周${wk} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    $live.textContent = `现在 ${now.getFullYear()}.${pad(now.getMonth()+1)}.${pad(now.getDate())} 周${wk} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
   }
 
+  paintToday();
   paint();
   // 用 setInterval 1000ms，配合每秒重绘
   setInterval(paint, 1000);
