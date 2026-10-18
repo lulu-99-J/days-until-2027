@@ -168,11 +168,19 @@
     </div>
   </section>
 
-  <!-- 记忆胶囊：写给未来每一天的一句话（只存在本机） -->
+  <!-- 记忆胶囊：写给未来每一天的一句话（只存在本机，默认只看当天，‹ › 翻历史） -->
   <section class="mt-6 bg-white/60 backdrop-blur-sm rounded-[24px] border border-sand/60 px-6 py-5">
     <div class="flex items-center justify-between">
       <p class="text-[10px] tracking-[0.3em] text-softink uppercase">capsule · 记忆胶囊</p>
       <p class="text-[11px] text-softink digit"><span id="capsule-count">0</span> 条</p>
+    </div>
+    <!-- 日期导航：默认今天，‹ › 翻历史 -->
+    <div class="mt-3 flex items-center justify-center gap-4">
+      <button id="cap-prev" aria-label="前一天"
+              class="w-7 h-7 rounded-full border border-sand bg-cream text-softink hover:border-mauve hover:text-cocoa transition active:scale-95 text-[14px] leading-none">‹</button>
+      <button id="cap-today" class="text-[12px] text-softink digit tracking-wide hover:text-cocoa transition">--</button>
+      <button id="cap-next" aria-label="后一天"
+              class="w-7 h-7 rounded-full border border-sand bg-cream text-softink transition active:scale-95 text-[14px] leading-none">›</button>
     </div>
     <div class="mt-3 flex gap-2">
       <input id="capsule-input" type="text" maxlength="80" placeholder="今天想记点什么…"
@@ -181,7 +189,7 @@
               class="shrink-0 px-4 rounded-xl bg-mauve/80 hover:bg-mauve text-white text-[13px] transition active:scale-95">存下</button>
     </div>
     <ul id="capsule-list" class="mt-3 space-y-2 max-h-56 overflow-y-auto"></ul>
-    <p id="capsule-empty" class="mt-2 text-[12px] text-softink/50 text-center">还没有记录，想到什么都可以丢进来</p>
+    <p id="capsule-empty" class="mt-2 text-[12px] text-softink/50 text-center">这天还没有记录</p>
   </section>
 
   <!-- 心愿列表：等到那天想做的事（可编辑，只存在本机） -->
@@ -385,24 +393,60 @@
 
   const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-  // ---- 记忆胶囊 ----
+  // ---- 记忆胶囊（按日期查看：默认今天，‹ › 翻历史）----
   const $capInput  = document.getElementById('capsule-input');
   const $capAdd    = document.getElementById('capsule-add');
   const $capList   = document.getElementById('capsule-list');
   const $capEmpty  = document.getElementById('capsule-empty');
   const $capCount  = document.getElementById('capsule-count');
+  const $capPrev   = document.getElementById('cap-prev');
+  const $capNext   = document.getElementById('cap-next');
+  const $capToday  = document.getElementById('cap-today');
+
+  const pad2 = n => String(n).padStart(2, '0');
+  const dateKey = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  const TODAY_KEY = dateKey(new Date());
+
+  // 数据迁移：旧格式 {d:'10.17'} → 新格式 {date:'2026-10-17'}
+  const migrated = capsules.some(c => !c.date);
+  capsules = capsules.map(c => {
+    if (c.date) return c;
+    const y = new Date().getFullYear();
+    const m = c.d.match(/^(\d{1,2})\.(\d{1,2})$/);
+    return { date: m ? `${y}-${pad2(+m[1])}-${pad2(+m[2])}` : TODAY_KEY, t: c.t };
+  });
+  if (migrated) saveLS(LS_CAPSULE, capsules); // 迁移结果立即落盘
+
+  let viewKey = TODAY_KEY; // 当前查看的日期
+
+  function shiftView(days) {
+    const [y, m, d] = viewKey.split('-').map(Number);
+    const dt = new Date(y, m - 1, d + days);
+    const k = dateKey(dt);
+    if (k > TODAY_KEY) return;          // 不能翻到未来
+    viewKey = k;
+    renderCapsules();
+  }
+
+  $capPrev.addEventListener('click', () => shiftView(-1));
+  $capNext.addEventListener('click', () => shiftView(1));
+  $capToday.addEventListener('click', () => { viewKey = TODAY_KEY; renderCapsules(); });
 
   function renderCapsules() {
+    const isToday = viewKey === TODAY_KEY;
+    const dayItems = capsules.filter(c => (c.date || TODAY_KEY) === viewKey);
     $capList.innerHTML = '';
-    $capCount.textContent = capsules.length;
-    $capEmpty.style.display = capsules.length ? 'none' : '';
-    capsules.forEach((item, i) => {
+    $capCount.textContent = dayItems.length;
+    $capEmpty.textContent = isToday ? '今天还没有记录，想到什么都可以丢进来' : '这天还没有记录';
+    $capEmpty.style.display = dayItems.length ? 'none' : '';
+    $capNext.style.opacity = viewKey >= TODAY_KEY ? '0.3' : '1';
+    $capToday.textContent = isToday ? '今天' : viewKey.replace(/-/g, '.').slice(5) + '（点回今天）';
+    dayItems.forEach((item, i) => {
       const li = document.createElement('li');
       li.className = 'flex items-start gap-2 group';
       li.innerHTML = `
-        <span class="shrink-0 mt-0.5 text-[11px] text-softink/60 digit">${esc(item.d)}</span>
         <span class="flex-1 text-[13px] text-ink/90 leading-relaxed break-words">${esc(item.t)}</span>
-        <button data-i="${i}" class="cap-del shrink-0 text-softink/30 hover:text-blush text-[14px] leading-none px-1" aria-label="删除">×</button>
+        <button data-i="${capsules.indexOf(item)}" class="cap-del shrink-0 text-softink/30 hover:text-blush text-[14px] leading-none px-1" aria-label="删除">×</button>
       `;
       $capList.appendChild(li);
     });
@@ -411,10 +455,10 @@
   function addCapsule() {
     const t = $capInput.value.trim();
     if (!t) return;
-    const now = new Date();
-    capsules.unshift({ d: `${now.getMonth()+1}.${now.getDate()}`, t });
+    capsules.unshift({ date: TODAY_KEY, t });
     $capInput.value = '';
     saveLS(LS_CAPSULE, capsules);
+    viewKey = TODAY_KEY;                // 存完自动跳回今天
     renderCapsules();
   }
   $capAdd.addEventListener('click', addCapsule);
