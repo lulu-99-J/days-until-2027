@@ -324,6 +324,7 @@
   }
 
   function paint() {
+    checkDayRollover(); // 跨天了就先刷新今日卡/胶囊视图
     const now = Date.now();
     let diff = TARGET - now;
 
@@ -405,7 +406,8 @@
 
   const pad2 = n => String(n).padStart(2, '0');
   const dateKey = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
-  const TODAY_KEY = dateKey(new Date());
+  // 可变：跨天时由 checkDayRollover() 滚动到新的一天
+  let TODAY_KEY = dateKey(new Date());
 
   // 数据迁移：旧格式 {d:'10.17'} → 新格式 {date:'2026-10-17'}
   const migrated = capsules.some(c => !c.date);
@@ -534,6 +536,20 @@
     if (t) { wishes[i].t = t; saveLS(LS_WISH, wishes); }
     else   { inp.value = wishes[i].t; } // 空值不保存，还原
   });
+
+  // ---- 跨天检测：页面一直开着也能"醒来就是新的一天" ----
+  // 由每秒的 paint() 调用；发现日期变了就刷新今日卡 + 滚动"今天"指针
+  function checkDayRollover() {
+    const k = dateKey(new Date());
+    if (k === TODAY_KEY) return;
+    const wasViewingToday = viewKey === TODAY_KEY;
+    TODAY_KEY = k;
+    paintToday();                       // 今日卡换新一天的话语和任务
+    if (wasViewingToday) {
+      viewKey = k;                      // 正在看"今天"就跟到新的一天
+      renderCapsules();
+    }
+  }
 
   // 先注册秒表：即使下面任何初始化出错，倒计时也照常跳动
   setInterval(paint, 1000);
