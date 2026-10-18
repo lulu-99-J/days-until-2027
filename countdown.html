@@ -561,6 +561,24 @@
   } catch (e) { console.error('init:', e); }
 
   paint();
+
+  // ---- 自更新检测：App 长期开着也能自动拿到线上新版本 ----
+  try {
+    const BUILD = '2026-10-18a';
+    async function checkUpdate() {
+      try {
+        const resp = await fetch(location.href, { cache: 'no-store' });
+        if (!resp.ok) return;
+        const m = (await resp.text()).match(/const BUILD = '([^']+)'/);
+        if (m && m[1] !== BUILD) location.reload(); // 线上版本更新了 → 自动刷新
+      } catch (e) { /* 网络不通，下次再查 */ }
+    }
+    setInterval(checkUpdate, 30 * 60 * 1000);  // 每 30 分钟查一次
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) checkUpdate();     // 切回前台立刻查
+    });
+    checkUpdate();
+  } catch (e) { /* 更新检测失败不影响主功能 */ }
 })();
 </script>
 </body>
