@@ -155,6 +155,28 @@
     </div>
   </section>
 
+  <!-- 工作日 / 休息日：把「还剩多少天」拆成更有体感的两个数 -->
+  <section class="mt-6 bg-white/60 backdrop-blur-sm rounded-[24px] border border-sand/60 px-6 py-5">
+    <div class="flex items-center justify-between">
+      <p class="text-[10px] tracking-[0.3em] text-softink uppercase">workdays · 掰着手指数</p>
+      <p class="text-[11px] text-softink">到 02 · 15 之前</p>
+    </div>
+    <div class="mt-4 grid grid-cols-2 gap-3">
+      <div class="bg-cream rounded-2xl py-4 border border-sand/70 text-center">
+        <div id="workdays" class="digit text-3xl font-medium text-ink">--</div>
+        <div class="text-[11px] tracking-[0.2em] text-softink mt-1">个工作日</div>
+      </div>
+      <div class="bg-blush/25 rounded-2xl py-4 border border-blush/60 text-center">
+        <div id="restdays" class="digit text-3xl font-medium text-cocoa">--</div>
+        <div class="text-[11px] tracking-[0.2em] text-cocoa/80 mt-1">个休息日</div>
+      </div>
+    </div>
+    <p class="mt-3 text-center text-[11px] text-softink/70">
+      双休 <span id="rest-weekend" class="digit">--</span> 天 · 法定假日 <span id="rest-holiday" class="digit">--</span> 天
+    </p>
+    <p class="mt-1 text-center text-[10px] text-softink/50">2027 年调休安排尚未公布，公布后可再校正</p>
+  </section>
+
   <!-- 今日小卡：让 129 天每天打开都有一点不一样 -->
   <section class="mt-6 bg-white/60 backdrop-blur-sm rounded-[24px] border border-sand/60 px-6 py-5">
     <div class="flex items-center justify-between">
@@ -379,6 +401,38 @@
     $live.textContent = `现在 ${nd.getFullYear()}.${pad(nd.getMonth()+1)}.${pad(nd.getDate())} 周${wk} ${pad(nd.getHours())}:${pad(nd.getMinutes())}:${pad(nd.getSeconds())}`;
   }
 
+  /* ---------- 工作日 / 休息日 ---------- */
+  const $workdays    = document.getElementById('workdays');
+  const $restdays    = document.getElementById('restdays');
+  const $restWeekend = document.getElementById('rest-weekend');
+  const $restHoliday = document.getElementById('rest-holiday');
+
+  // 法定节假日（国务院《全国年节及纪念日放假办法》定死的日子）
+  // 元旦 1 天；春节初一至初三 3 天。2027 春节 = 正月初一 02.06
+  // 若正好落在周末，只按周末算一次，不重复计数
+  const HOLIDAYS = new Set([
+    '2027-01-01',
+    '2027-02-06', '2027-02-07', '2027-02-08',
+  ]);
+
+  function paintWorkdays() {
+    const cursor = new Date();
+    cursor.setHours(0, 0, 0, 0);
+    cursor.setDate(cursor.getDate() + 1);  // 与倒计时"还剩 N 天"同口径：今天不计入
+    let work = 0, weekend = 0, holiday = 0;
+    while (cursor.getTime() < TARGET) {    // 不含到达日当天
+      const dow = cursor.getDay();
+      if (dow === 0 || dow === 6) weekend++;
+      else if (HOLIDAYS.has(dateKey(cursor))) holiday++;
+      else work++;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    $workdays.textContent    = work;
+    $restdays.textContent    = weekend + holiday;
+    $restWeekend.textContent = weekend;
+    $restHoliday.textContent = holiday;
+  }
+
   /* ---------- LocalStorage：记忆胶囊 + 心愿列表 ---------- */
   const LS_CAPSULE = 'countdown.capsules';
   const LS_WISH    = 'countdown.wishes';
@@ -545,6 +599,7 @@
     const wasViewingToday = viewKey === TODAY_KEY;
     TODAY_KEY = k;
     paintToday();                       // 今日卡换新一天的话语和任务
+    paintWorkdays();                    // 工作日/休息日跟着减
     if (wasViewingToday) {
       viewKey = k;                      // 正在看"今天"就跟到新的一天
       renderCapsules();
@@ -558,13 +613,14 @@
     renderCapsules();
     renderWishes();
     paintToday();
+    paintWorkdays();
   } catch (e) { console.error('init:', e); }
 
   paint();
 
   // ---- 自更新检测：App 长期开着也能自动拿到线上新版本 ----
   try {
-    const BUILD = '2026-10-18a';
+    const BUILD = '2026-10-19a';
     async function checkUpdate() {
       try {
         const resp = await fetch(location.href, { cache: 'no-store' });
