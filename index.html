@@ -173,8 +173,9 @@
     </div>
     <p class="mt-3 text-center text-[11px] text-softink/70">
       双休 <span id="rest-weekend" class="digit">--</span> 天 · 法定假日 <span id="rest-holiday" class="digit">--</span> 天
+      <span id="rest-override-wrap"> · 调休上班 <span id="rest-override" class="digit">--</span> 天</span>
     </p>
-    <p class="mt-1 text-center text-[10px] text-softink/50">2027 年调休安排尚未公布，公布后可再校正</p>
+    <p class="mt-1 text-center text-[10px] text-softink/50">按国务院 2027 年放假通知计算（2026.11.05 发布）</p>
   </section>
 
   <!-- 今日小卡：让 129 天每天打开都有一点不一样 -->
@@ -402,35 +403,44 @@
   }
 
   /* ---------- 工作日 / 休息日 ---------- */
-  const $workdays    = document.getElementById('workdays');
-  const $restdays    = document.getElementById('restdays');
-  const $restWeekend = document.getElementById('rest-weekend');
-  const $restHoliday = document.getElementById('rest-holiday');
+  const $workdays     = document.getElementById('workdays');
+  const $restdays     = document.getElementById('restdays');
+  const $restWeekend  = document.getElementById('rest-weekend');
+  const $restHoliday  = document.getElementById('rest-holiday');
+  const $restOverride = document.getElementById('rest-override');
 
-  // 法定节假日（国务院《全国年节及纪念日放假办法》定死的日子）
-  // 元旦 1 天；春节初一至初三 3 天。2027 春节 = 正月初一 02.06
-  // 若正好落在周末，只按周末算一次，不重复计数
+  // 法定节假日 + 调休上班日：按《国务院办公厅关于2027年部分节假日安排的通知》
+  // （国办发明电〔2026〕10号，2026-11-05 发布）
+  //  元旦：1月1日(周五)–3日(周日)放假，共3天
+  //  春节：2月5日(除夕、周五)–13日(正月初八、周六)放假调休，共9天
+  //  调休上班：1月31日(周日)、2月14日(周日)
   const HOLIDAYS = new Set([
-    '2027-01-01',
-    '2027-02-06', '2027-02-07', '2027-02-08',
+    '2027-01-01', '2027-01-02', '2027-01-03',
+    '2027-02-05', '2027-02-06', '2027-02-07', '2027-02-08',
+    '2027-02-09', '2027-02-10', '2027-02-11', '2027-02-12', '2027-02-13',
   ]);
+  // 周末调休上班日（周日照常上班）
+  const WORK_OVERRIDE = new Set(['2027-01-31', '2027-02-14']);
 
   function paintWorkdays() {
     const cursor = new Date();
     cursor.setHours(0, 0, 0, 0);
     cursor.setDate(cursor.getDate() + 1);  // 与倒计时"还剩 N 天"同口径：今天不计入
-    let work = 0, weekend = 0, holiday = 0;
+    let work = 0, weekend = 0, holiday = 0, override = 0;
     while (cursor.getTime() < TARGET) {    // 不含到达日当天
+      const k = dateKey(cursor);
       const dow = cursor.getDay();
-      if (dow === 0 || dow === 6) weekend++;
-      else if (HOLIDAYS.has(dateKey(cursor))) holiday++;
+      if (HOLIDAYS.has(k)) holiday++;            // 官方放假（优先）
+      else if (WORK_OVERRIDE.has(k)) { override++; work++; } // 周末调休上班：也算工作日
+      else if (dow === 0 || dow === 6) weekend++;
       else work++;
       cursor.setDate(cursor.getDate() + 1);
     }
-    $workdays.textContent    = work;
-    $restdays.textContent    = weekend + holiday;
-    $restWeekend.textContent = weekend;
-    $restHoliday.textContent = holiday;
+    $workdays.textContent     = work;
+    $restdays.textContent     = weekend + holiday;
+    $restWeekend.textContent  = weekend;
+    $restHoliday.textContent  = holiday;
+    $restOverride.textContent = override;
   }
 
   /* ---------- LocalStorage：记忆胶囊 + 心愿列表 ---------- */
@@ -620,7 +630,7 @@
 
   // ---- 自更新检测：App 长期开着也能自动拿到线上新版本 ----
   try {
-    const BUILD = '2026-10-19a';
+    const BUILD = '2026-11-20a';
     async function checkUpdate() {
       try {
         const resp = await fetch(location.href, { cache: 'no-store' });
